@@ -8,59 +8,103 @@
 --        __/\\\\\\\\\\\_\/\\\___\//\\\\\_\/\\\_____________\///\\\\\/______/\\\\\\\\\\\\\\\__\///\\\\\\\/____\///\\\\\\\/____\///\\\\\\\/___\///\\\\\\\\\/_____________\/\\\_______\/\\\__/\\\\\\\\\\\\\\\_ 
 --         _\///////////__\///_____\/////__\///________________\/////_______\///////////////_____\///////________\///////________\///////_______\/////////_______________\///________\///__\///////////////__
 
--- Your Name: XXXXXXXXXXXX
--- Your Student Number: XXXXXXX
+-- Your Name: Kevin Yu
+-- Your Student Number: 1462539
 -- By submitting, you declare that this work was completed entirely by yourself.
 
 -- ____________________________________________________________________________________________________________________________________________________________________________________________________________
 -- BEGIN Q1
 
-
+SELECT postPermanentID, text
+FROM post
+WHERE postPermanentID NOT IN (
+	SELECT DISTINCT postID
+    FROM react);
 
 -- END Q1
 -- ____________________________________________________________________________________________________________________________________________________________________________________________________________
 -- BEGIN Q2
 
-
-
+SELECT moderator.modID, user.username, moderator.dateModStatus
+FROM moderator INNER JOIN user ON moderator.linkedUserID = user.userID
+ORDER BY moderator.dateModStatus DESC
+LIMIT 1;
 
 -- END Q2
 -- ____________________________________________________________________________________________________________________________________________________________________________________________________________
 -- BEGIN Q3
 
-
-
+SELECT postPermanentID, viewCount
+FROM post
+WHERE viewCount > 9000 AND authorID = (
+	SELECT userID
+    FROM user
+    WHERE username = 'axe');
 
 -- END Q3
 -- ____________________________________________________________________________________________________________________________________________________________________________________________________________
 -- BEGIN Q4
 
-
-
+SELECT originalPostID AS postPermanentID, COUNT(replyPostID) AS totalCommentCount
+FROM postreply
+GROUP BY originalPostID
+HAVING COUNT(replyPostID) = (
+  SELECT MAX(totalCount)
+  FROM (
+    SELECT COUNT(replyPostID) AS totalCount
+    FROM postreply
+    GROUP BY originalPostID
+  ) AS subquery
+);
 
 -- END Q4
 -- ____________________________________________________________________________________________________________________________________________________________________________________________________________
 -- BEGIN Q5
 
-
-
-
+SELECT atch.dataURL, channel.channelID
+FROM attachmentobject AS atch 
+	INNER JOIN post ON atch.postPermanentID = post.postPermanentID
+	INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
+	INNER JOIN channel ON postchannel.channelID = channel.channelID
+WHERE channel.channelName LIKE '%dota2%';
 
 -- END Q5
 -- ____________________________________________________________________________________________________________________________________________________________________________________________________________
 -- BEGIN Q6
 
-
-
-
+SELECT channel.channelName, COUNT(react.emoji) AS heartCount
+FROM react
+	INNER JOIN post ON react.postID = post.postPermanentID
+	INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
+	INNER JOIN channel ON postchannel.channelID = channel.channelID
+WHERE react.emoji = 'love'
+GROUP BY channel.channelID
+HAVING COUNT(react.emoji) = (
+	SELECT MAX(heartCountPerChannel)
+		FROM (
+			SELECT COUNT(react.emoji) AS heartCountPerChannel
+			FROM react
+				INNER JOIN post ON react.postID = post.postPermanentID
+				INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
+				INNER JOIN channel ON postchannel.channelID = channel.channelID
+			WHERE react.emoji = 'love'
+			GROUP BY channel.channelID
+		) AS channelheartcount);
 
 -- END Q6
 -- ____________________________________________________________________________________________________________________________________________________________________________________________________________
 -- BEGIN Q7
 
-
-
-
+SELECT user.userID, user.reputation, 
+	COUNT(DISTINCT moderatorreport.caseID) AS totalModeratorReports, 
+    COUNT(CASE WHEN react.emoji = 'love' THEN 1 END) AS totalLoveReacts
+FROM user
+	INNER JOIN post ON user.userID = post.authorID
+	LEFT JOIN react ON post.postPermanentID = react.postID
+	LEFT JOIN moderatorreport ON post.postPermanentID = moderatorreport.postPermanentID
+WHERE user.reputation < 60
+GROUP BY user.userID
+HAVING totalLoveReacts >= 3 AND totalModeratorReports >= 1;
 
 -- END Q7
 -- ____________________________________________________________________________________________________________________________________________________________________________________________________________
