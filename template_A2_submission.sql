@@ -135,74 +135,6 @@ ORDER BY totalVirusInfectedAttachments DESC;
 -- ____________________________________________________________________________________________________________________________________________________________________________________________________________
 -- BEGIN Q9
 
-
-SELECT user.userID, channel.channelID, COUNT(moderatorreport.caseID)
-FROM user
-	INNER JOIN post ON user.userID = post.authorID
-    INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
-    INNER JOIN channel ON postchannel.channelID = channel.channelID
-    LEFT JOIN moderatorreport ON post.postPermanentID = moderatorreport.postPermanentID
-GROUP BY user.userID, channel.channelID
-HAVING COUNT(moderatorreport.caseID) > 0
-ORDER BY user.userID;
-
-SELECT user.userID, channel.channelID, SUM(moderatorreport.disciplinaryAction)
-FROM user
-	INNER JOIN post ON user.userID = post.authorID
-    INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
-    INNER JOIN channel ON postchannel.channelID = channel.channelID
-    LEFT JOIN moderatorreport ON post.postPermanentID = moderatorreport.postPermanentID
-GROUP BY user.userID, channel.channelID
-HAVING SUM(moderatorreport.disciplinaryAction) > 0
-ORDER BY user.userID;
-
-
-SELECT userReports.userID, COUNT(DISTINCT userReports.channelID) AS reportedChannels
-FROM (
-    SELECT user.userID, channel.channelID, SUM(moderatorreport.disciplinaryAction) AS disciplinaryActionCount
-    FROM user
-		INNER JOIN post ON user.userID = post.authorID
-		INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
-		INNER JOIN channel ON postchannel.channelID = channel.channelID
-		LEFT JOIN moderatorreport ON post.postPermanentID = moderatorreport.postPermanentID
-    GROUP BY user.userID, channel.channelID
-    HAVING SUM(moderatorreport.disciplinaryAction) > 0
-) AS useraction
-GROUP BY userReports.userID
-HAVING COUNT(DISTINCT userReports.channelID) > 1
-ORDER BY userReports.userID;
-
--- -- --
-
-SELECT user.userID
-FROM user
-	INNER JOIN post ON user.userID = post.authorID
-	INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
-	INNER JOIN moderatorreport ON post.postPermanentID = moderatorreport.postPermanentID -- only keep those with reports with inner join
-GROUP BY user.userID
-HAVING COUNT(DISTINCT postchannel.channelID) > 1;
-        
-        
-        
-        
-SELECT *
-FROM moderatorreport
-	INNER JOIN post ON moderatorreport.postPermanentID = post.postPermanentID
-	INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
-	INNER JOIN (
-		-- Subquery to identify repeaters
-		SELECT user.userID
-		FROM user
-			INNER JOIN post ON user.userID = post.authorID
-			INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
-            -- only keeps those reported with inner join
-			INNER JOIN moderatorreport ON post.postPermanentID = moderatorreport.postPermanentID 
-		GROUP BY user.userID
-		HAVING COUNT(DISTINCT postchannel.channelID) > 1
-	) AS repeaters ON post.authorID = repeaters.userID;
-
-
-
 SELECT moderatorreport.modID, COUNT(moderatorreport.caseID) AS numberOfDisciplinariesToRepeaters
 FROM moderatorreport
 	INNER JOIN post ON moderatorreport.postPermanentID = post.postPermanentID
@@ -220,14 +152,30 @@ FROM moderatorreport
 WHERE moderatorreport.disciplinaryAction = 1
 GROUP BY moderatorreport.modID;
 
-
 -- END Q9
 -- ____________________________________________________________________________________________________________________________________________________________________________________________________________
 -- BEGIN Q10
 
+SELECT user.userID
+FROM user
+	INNER JOIN post ON user.userID = post.authorID
+    INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
+    INNER JOIN channel ON postchannel.channelID = channel.channelID
+WHERE post.dateCreated < '2024-04-01' AND channel.channelName = 'ranked_grind';
 
-
-
+SELECT userID
+FROM user
+	INNER JOIN post ON user.userID = post.authorID
+    LEFT JOIN postreply ON post.postPermanentID = postreply.originalPostID
+    INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
+    INNER JOIN channel ON postchannel.channelID = channel.channelID
+WHERE post.dateCreated >= '2024-04-01' AND postreply.replyPostID IN (
+	SELECT post.postPermanentID
+	FROM post 
+		INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
+		INNER JOIN channel ON postchannel.channelID = channel.channelID
+	WHERE channel.channelName = 'dota2_memes'
+);
 
 -- END Q10
 -- ____________________________________________________________________________________________________________________________________________________________________________________________________________
