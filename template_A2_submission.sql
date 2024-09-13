@@ -110,22 +110,6 @@ HAVING totalLoveReacts >= 3 AND totalModeratorReports >= 1;
 -- ____________________________________________________________________________________________________________________________________________________________________________________________________________
 -- BEGIN Q8
 
-SELECT channel.channelID, channel.Name, SUM(atch.virusScanned) AS totalVirusInfectedAttachments
-FROM channel
-	INNER JOIN postchannel ON channel.channelID = postchannel.channelID
-	INNER JOIN post ON postchannel.postID = post.postPermanentID
-	INNER JOIN attachmentobject AS atch ON post.postPermanentID = atch.postPermanentID
-GROUP BY channel.channelID
-HAVING SUM(atch.virusScanned) IN (
-	SELECT DISTINCT virusCount FROM (
-		SELECT channel.channelID, SUM(atch.virusScanned) AS virusCount
-		FROM channel
-			INNER JOIN postchannel ON channel.channelID = postchannel.channelID
-			INNER JOIN post ON postchannel.postID = post.postPermanentID
-			INNER JOIN attachmentobject AS atch ON post.postPermanentID = atch.postPermanentID
-		GROUP BY channel.channelID) AS channelviruscount
-	ORDER BY virusCount DESC
-	LIMIT 3);
 -- Note: I did not use the straight forward approach of using IN since LIMIT cannot be in subquery
 SELECT channel.channelID, channel.channelName, SUM(atch.virusScanned) AS totalVirusInfectedAttachments
 FROM channel
@@ -152,7 +136,89 @@ ORDER BY totalVirusInfectedAttachments DESC;
 -- BEGIN Q9
 
 
+SELECT user.userID, channel.channelID, COUNT(moderatorreport.caseID)
+FROM user
+	INNER JOIN post ON user.userID = post.authorID
+    INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
+    INNER JOIN channel ON postchannel.channelID = channel.channelID
+    LEFT JOIN moderatorreport ON post.postPermanentID = moderatorreport.postPermanentID
+GROUP BY user.userID, channel.channelID
+HAVING COUNT(moderatorreport.caseID) > 0
+ORDER BY user.userID;
 
+SELECT user.userID, channel.channelID, SUM(moderatorreport.disciplinaryAction)
+FROM user
+	INNER JOIN post ON user.userID = post.authorID
+    INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
+    INNER JOIN channel ON postchannel.channelID = channel.channelID
+    LEFT JOIN moderatorreport ON post.postPermanentID = moderatorreport.postPermanentID
+GROUP BY user.userID, channel.channelID
+HAVING SUM(moderatorreport.disciplinaryAction) > 0
+ORDER BY user.userID;
+
+
+SELECT userReports.userID, COUNT(DISTINCT userReports.channelID) AS reportedChannels
+FROM (
+    SELECT user.userID, channel.channelID, SUM(moderatorreport.disciplinaryAction) AS disciplinaryActionCount
+    FROM user
+		INNER JOIN post ON user.userID = post.authorID
+		INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
+		INNER JOIN channel ON postchannel.channelID = channel.channelID
+		LEFT JOIN moderatorreport ON post.postPermanentID = moderatorreport.postPermanentID
+    GROUP BY user.userID, channel.channelID
+    HAVING SUM(moderatorreport.disciplinaryAction) > 0
+) AS useraction
+GROUP BY userReports.userID
+HAVING COUNT(DISTINCT userReports.channelID) > 1
+ORDER BY userReports.userID;
+
+-- -- --
+
+SELECT user.userID
+FROM user
+	INNER JOIN post ON user.userID = post.authorID
+	INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
+	INNER JOIN moderatorreport ON post.postPermanentID = moderatorreport.postPermanentID -- only keep those with reports with inner join
+GROUP BY user.userID
+HAVING COUNT(DISTINCT postchannel.channelID) > 1;
+        
+        
+        
+        
+SELECT *
+FROM moderatorreport
+	INNER JOIN post ON moderatorreport.postPermanentID = post.postPermanentID
+	INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
+	INNER JOIN (
+		-- Subquery to identify repeaters
+		SELECT user.userID
+		FROM user
+			INNER JOIN post ON user.userID = post.authorID
+			INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
+            -- only keeps those reported with inner join
+			INNER JOIN moderatorreport ON post.postPermanentID = moderatorreport.postPermanentID 
+		GROUP BY user.userID
+		HAVING COUNT(DISTINCT postchannel.channelID) > 1
+	) AS repeaters ON post.authorID = repeaters.userID;
+
+
+
+SELECT moderatorreport.modID, COUNT(moderatorreport.caseID) AS numberOfDisciplinariesToRepeaters
+FROM moderatorreport
+	INNER JOIN post ON moderatorreport.postPermanentID = post.postPermanentID
+	INNER JOIN (
+		-- Subquery to identify repeaters
+		SELECT user.userID
+		FROM user
+			INNER JOIN post ON user.userID = post.authorID
+			INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
+            -- only keeps those reported with inner join
+			INNER JOIN moderatorreport ON post.postPermanentID = moderatorreport.postPermanentID 
+		GROUP BY user.userID
+		HAVING COUNT(DISTINCT postchannel.channelID) > 1
+	) AS repeaters ON post.authorID = repeaters.userID
+WHERE moderatorreport.disciplinaryAction = 1
+GROUP BY moderatorreport.modID;
 
 
 -- END Q9
