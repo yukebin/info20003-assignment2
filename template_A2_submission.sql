@@ -54,7 +54,7 @@ HAVING COUNT(replyPostID) = (
     SELECT COUNT(replyPostID) AS totalCount
     FROM postreply
     GROUP BY originalPostID
-  ) AS subquery
+  ) AS commentcount
 );
 
 -- END Q4
@@ -110,9 +110,42 @@ HAVING totalLoveReacts >= 3 AND totalModeratorReports >= 1;
 -- ____________________________________________________________________________________________________________________________________________________________________________________________________________
 -- BEGIN Q8
 
-
-
-
+SELECT channel.channelID, channel.Name, SUM(atch.virusScanned) AS totalVirusInfectedAttachments
+FROM channel
+	INNER JOIN postchannel ON channel.channelID = postchannel.channelID
+	INNER JOIN post ON postchannel.postID = post.postPermanentID
+	INNER JOIN attachmentobject AS atch ON post.postPermanentID = atch.postPermanentID
+GROUP BY channel.channelID
+HAVING SUM(atch.virusScanned) IN (
+	SELECT DISTINCT virusCount FROM (
+		SELECT channel.channelID, SUM(atch.virusScanned) AS virusCount
+		FROM channel
+			INNER JOIN postchannel ON channel.channelID = postchannel.channelID
+			INNER JOIN post ON postchannel.postID = post.postPermanentID
+			INNER JOIN attachmentobject AS atch ON post.postPermanentID = atch.postPermanentID
+		GROUP BY channel.channelID) AS channelviruscount
+	ORDER BY virusCount DESC
+	LIMIT 3);
+-- Note: I did not use the straight forward approach of using IN since LIMIT cannot be in subquery
+SELECT channel.channelID, channel.channelName, SUM(atch.virusScanned) AS totalVirusInfectedAttachments
+FROM channel
+	INNER JOIN postchannel ON channel.channelID = postchannel.channelID
+	INNER JOIN post ON postchannel.postID = post.postPermanentID
+	INNER JOIN attachmentobject AS atch ON post.postPermanentID = atch.postPermanentID
+GROUP BY channel.channelID
+HAVING totalVirusInfectedAttachments >= (
+    SELECT MIN(virusCount)
+    FROM (
+        SELECT SUM(atch.virusScanned) AS virusCount
+        FROM channel
+			INNER JOIN postchannel ON channel.channelID = postchannel.channelID
+			INNER JOIN post ON postchannel.postID = post.postPermanentID
+			INNER JOIN attachmentobject AS atch ON post.postPermanentID = atch.postPermanentID
+        GROUP BY channel.channelID
+        ORDER BY virusCount DESC
+        LIMIT 3
+    ) AS top3)
+ORDER BY totalVirusInfectedAttachments DESC;
 
 -- END Q8
 -- ____________________________________________________________________________________________________________________________________________________________________________________________________________
