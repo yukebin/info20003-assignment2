@@ -36,7 +36,7 @@ LIMIT 1;
 
 SELECT postPermanentID, viewCount
 FROM post
-WHERE viewCount > 9000 AND authorID = (
+WHERE viewCount >= 9000 AND authorID = (
 	SELECT userID
     FROM user
     WHERE username = 'axe');
@@ -79,9 +79,12 @@ FROM react
 	INNER JOIN channel ON postchannel.channelID = channel.channelID
 WHERE react.emoji = 'love'
 GROUP BY channel.channelID
+-- Only count channels with the maximum heart count
 HAVING COUNT(react.emoji) = (
+	-- Subquery to get the max heart count across all channels
 	SELECT MAX(heartCountPerChannel)
 		FROM (
+			-- Subquery to calculate the heart count per channel
 			SELECT COUNT(react.emoji) AS heartCountPerChannel
 			FROM react
 				INNER JOIN post ON react.postID = post.postPermanentID
@@ -97,6 +100,7 @@ HAVING COUNT(react.emoji) = (
 
 SELECT user.userID, user.reputation, 
 	COUNT(DISTINCT moderatorreport.caseID) AS totalModeratorReports, 
+    -- Count only the 'love' emoji reactions on user's posts
     COUNT(CASE WHEN react.emoji = 'love' THEN 1 END) AS totalLoveReacts
 FROM user
 	INNER JOIN post ON user.userID = post.authorID
@@ -110,16 +114,18 @@ HAVING totalLoveReacts >= 3 AND totalModeratorReports >= 1;
 -- ____________________________________________________________________________________________________________________________________________________________________________________________________________
 -- BEGIN Q8
 
--- Note: I did not use the straight forward approach of using IN since LIMIT cannot be in subquery
 SELECT channel.channelID, channel.channelName, SUM(atch.virusScanned) AS totalVirusInfectedAttachments
 FROM channel
 	INNER JOIN postchannel ON channel.channelID = postchannel.channelID
 	INNER JOIN post ON postchannel.postID = post.postPermanentID
 	INNER JOIN attachmentobject AS atch ON post.postPermanentID = atch.postPermanentID
 GROUP BY channel.channelID
+-- Filter to only include channels where the count of virus-infected attachments is at least as high as the minimum in the top three
 HAVING totalVirusInfectedAttachments >= (
+	-- Subquery to find the min count of virus-infected attachments among the top 3 channels
     SELECT MIN(virusCount)
     FROM (
+		-- Get the virus counts for each channel (limit to top 3)
         SELECT SUM(atch.virusScanned) AS virusCount
         FROM channel
 			INNER JOIN postchannel ON channel.channelID = postchannel.channelID
@@ -144,7 +150,6 @@ FROM moderatorreport
 		FROM user
 			INNER JOIN post ON user.userID = post.authorID
 			INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
-            -- only keeps those reported with inner join
 			INNER JOIN moderatorreport ON post.postPermanentID = moderatorreport.postPermanentID 
 		GROUP BY user.userID
 		HAVING COUNT(DISTINCT postchannel.channelID) > 1
@@ -156,25 +161,26 @@ GROUP BY moderatorreport.modID;
 -- ____________________________________________________________________________________________________________________________________________________________________________________________________________
 -- BEGIN Q10
 
+-- Find users who have not posted in 'ranked_grind' before 01/04/2024
 SELECT user.userID
 FROM user
-	INNER JOIN post ON user.userID = post.authorID
+WHERE user.userID NOT IN (
+    SELECT DISTINCT user.userID
+    FROM user
+    INNER JOIN post ON user.userID = post.authorID
     INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
     INNER JOIN channel ON postchannel.channelID = channel.channelID
-WHERE post.dateCreated < '2024-04-01' AND channel.channelName = 'ranked_grind';
-
-SELECT userID
-FROM user
-	INNER JOIN post ON user.userID = post.authorID
-    LEFT JOIN postreply ON post.postPermanentID = postreply.originalPostID
+    WHERE post.dateCreated < '2024-04-01' AND channel.channelName = 'ranked_grind'
+)
+-- And who have posted a comment in 'dota2_memes' on or after 01/04/2024
+AND user.userID IN (
+    SELECT DISTINCT user.userID
+    FROM user
+    INNER JOIN post ON user.userID = post.authorID
+    INNER JOIN postreply ON post.postPermanentID = postreply.replyPostID
     INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
     INNER JOIN channel ON postchannel.channelID = channel.channelID
-WHERE post.dateCreated >= '2024-04-01' AND postreply.replyPostID IN (
-	SELECT post.postPermanentID
-	FROM post 
-		INNER JOIN postchannel ON post.postPermanentID = postchannel.postID
-		INNER JOIN channel ON postchannel.channelID = channel.channelID
-	WHERE channel.channelName = 'dota2_memes'
+    WHERE post.dateCreated >= '2024-04-01' AND channel.channelName = 'dota2_memes'
 );
 
 -- END Q10
